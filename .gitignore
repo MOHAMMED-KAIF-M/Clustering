@@ -1,0 +1,8 @@
+venv/
+input/
+real_input/
+output_clusters*/
+__pycache__/
+*.csv
+*.json
+.env
