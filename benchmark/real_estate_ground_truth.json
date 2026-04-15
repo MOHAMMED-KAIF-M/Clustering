@@ -1,0 +1,20 @@
+{
+  "dataset": "input",
+  "source": "Manually verified expected grouping based on output/clusters.json",
+  "labels": {
+    "DSC04222_HDR.jpg": "cluster_0",
+    "DSC04225_HDR.jpg": "cluster_0",
+    "DSC04252_HDR.jpg": "cluster_1",
+    "DSC04255_HDR.jpg": "cluster_1",
+    "DSC04228_HDR.jpg": "cluster_2",
+    "DSC04249_HDR.jpg": "cluster_2",
+    "DSC04231_HDR.jpg": "cluster_3",
+    "DSC04240_HDR.jpg": "cluster_3",
+    "DSC04243_HDR.jpg": "cluster_3",
+    "DSC04234_HDR.jpg": "cluster_4",
+    "DSC04237_HDR.jpg": "cluster_4"
+  },
+  "noise": [
+    "DSC04246_HDR.jpg"
+  ]
+}

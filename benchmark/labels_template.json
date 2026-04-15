@@ -1,0 +1,10 @@
+{
+  "labels": {
+    "example_image_001.jpg": "group_a",
+    "example_image_002.jpg": "group_a",
+    "example_image_003.jpg": "group_b"
+  },
+  "noise": [
+    "example_image_010.jpg"
+  ]
+}
