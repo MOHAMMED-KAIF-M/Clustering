@@ -1,14 +1,11 @@
-.venv/
-.vendor/
 .clip-cache/
 .sixth/
 .tmp/
+.vendor/
+.venv/
 __pycache__/
 *.pyc
 
-ouputs/
-output/
-new_output_folder/
 
-benchmark/comparison_report.json
-benchmark/real_estate_comparison_report.json
+
+*.log
