@@ -1,11 +1,9 @@
+.venv/
+.vendor/
 .clip-cache/
 .sixth/
 .tmp/
-.vendor/
-.venv/
 __pycache__/
 *.pyc
-
-
-
 *.log
+

@@ -16,24 +16,34 @@ The current pipeline is designed for cases like:
 - grayscale layout features for room structure
 - edge features for geometry cues
 - HSV color histogram features
+- SSIM-like structural viewpoint scoring behind a tunable weight
+- learned local descriptor scoring from CLIP tile crops
 - HDBSCAN clustering with tunable thresholds
 - second-stage same-corner refinement
 - strict same-corner plus same-items mode
+- optional per-image item flags from YOLOv8n segmentation, crop-aware CLIP prompt signatures, or semantic segmentation
 - ORB local matching for difficult viewpoint splits
-- merge-back of over-split subclusters using CLIP similarity
-- noise handling
+- graph-based clustering alternative for viewpoint and strict refinement
+- merge-back of over-split subclusters using semantic and viewpoint compatibility
+- explicit noise reasoning plus guarded reassignment
+- feature caching to avoid repeated image loading
+- config-backed presets and prompt sets
 - JSON output plus clustered image folders
+- `image_flags.json` with detected or inferred labels such as stove, refrigerator, sink, bed, or sofa
+- outline-style region annotations with labels on exported image copies whenever `--flag-items` is enabled
+- contact sheets, `summary.html`, and `run_manifest.json`
+- benchmark evaluation harness with comparison metrics
 
 ## What Is Not Implemented Yet
 
 This project does not currently use:
 
-- object detection such as YOLO, DETR, or Faster R-CNN
 - explicit scene classifiers such as Places365
 - object co-occurrence logic such as `bed + side table`
 - occupancy detection such as empty vs furnished as a dedicated model
 - luxury or material scoring
 - GLCM, LBP, Hough transform, or vanishing-point modeling
+- open-vocabulary object detection beyond the fixed YOLOv8 COCO label set
 
 That means the system is currently strongest at:
 
@@ -43,7 +53,7 @@ That means the system is currently strongest at:
 
 and weaker at:
 
-- explicit room labeling from detected objects
+- explicit room labeling for categories outside the YOLOv8 COCO label set
 - separating visually similar rooms with different hidden semantics
 
 ## How The Pipeline Works
@@ -99,6 +109,7 @@ These features are intended to capture:
 - similar corners and framing
 - broad appearance cues
 - prompt-level room/item cues in strict mode
+- a lightweight structural similarity signal when enabled
 
 See:
 
@@ -106,6 +117,8 @@ See:
 - [image_to_edge_vector](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/cluster_images.py:231>)
 - [image_to_color_histogram](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/cluster_images.py:238>)
 - [extract_visual_features](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/cluster_images.py:552>)
+
+Most image-derived features are cached once per image and reused in refinement, diagnostics, and output generation.
 
 ### 5. Fuse semantic and visual features
 
@@ -188,15 +201,24 @@ See:
 - [viewpoint_similarity_matrix](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/cluster_images.py:306>)
 - [maybe_refine_broad_viewpoint_cluster](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/cluster_images.py:384>)
 
+The viewpoint score can now be tuned with:
+
+- `--orb-weight`
+- `--structure-weight`
+- `--local-descriptor-mode`
+- `--local-descriptor-weight`
+- `--view-linkage`
+
 ### 9. Merge-back of over-split subclusters
 
 Sometimes viewpoint splitting is too strict.
 
-To prevent that, the script compares CLIP centroids of the resulting subclusters and merges them back when they are still semantically the same scene.
+To prevent that, the script compares CLIP centroids of the resulting subclusters and merges them back only when they are both semantically close and viewpoint-compatible.
 
 This is controlled by:
 
 - `--semantic-merge-threshold`
+- `--merge-view-threshold`
 
 See [merge_semantic_subclusters](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/cluster_images.py:500>).
 
@@ -210,7 +232,7 @@ the second-stage clustering becomes stricter.
 
 In this mode, the script:
 
-- builds CLIP prompt-signature features from a fixed list of room and object prompts
+- builds CLIP prompt-signature features from a selected prompt set
 - requires viewpoint similarity to be high enough
 - requires prompt-signature similarity to be high enough
 - requires CLIP image embedding similarity to stay above a semantic floor
@@ -224,6 +246,8 @@ Important:
 
 - this is still not full object detection
 - it is a stronger CLIP-based proxy for item similarity
+- prompt sets are configurable in `configs/prompt_sets.json`
+- linkage is configurable with `--strict-linkage`
 
 ### 11. Write output
 
@@ -232,11 +256,23 @@ The script creates:
 - `output/cluster_0`
 - `output/cluster_1`
 - `output/noise`
+- `output/cluster_0_contact.jpg`
+- `output/noise_contact.jpg`
 
 and writes:
 
 - `output/clusters.json`
 - `output/match_scores.json`
+- `output/image_flags.json`
+- `output/run_manifest.json`
+- `output/summary.html`
+
+It also records:
+
+- `noise_details` with explicit reasons
+- `merge_events` for merge-back decisions
+- `skipped_images` for unreadable files
+- `image_output_paths` for clickable exported image links in `summary.html`
 
 See [copy_clustered_images](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/cluster_images.py:914>).
 
@@ -260,6 +296,10 @@ The output JSON looks like this:
 
 `match_scores.json` contains pairwise image-to-image matching percentages, sorted from strongest match to weakest match for each image.
 
+`image_flags.json` contains per-image labels derived from the selected detection backend. By default, `--flag-items` now uses the adaptive `hybrid` backend with `yolov8x-seg.pt`, then backfills missed labels with OWLv2, SegFormer, and CLIP when needed.
+
+When `--flag-items` is enabled, those labels are now drawn onto the copied output images by default as outline-style boundaries with attached labels. Use `--no-annotate-flagged-images` if you want clean exported copies. The exported boundaries now come from YOLO segmentation masks when available, with the detection box used as a fallback.
+
 ## Installation
 
 ### Option 1: normal environment install
@@ -281,12 +321,28 @@ The script supports both:
 - vendored CLIP in `.vendor`
 - normal installed `clip` package in the Python environment
 
+On the first YOLO-backed flagging run, Ultralytics may also download the configured weights if they are not already available locally. You can point to an existing file explicitly with `--yolo-model`.
+
+Validate the runtime setup before a full run:
+
+```powershell
+python cluster_images.py --validate-setup
+```
+
 ## Run
 
 Basic run:
 
 ```powershell
 python cluster_images.py --input ./input --output ./output
+```
+
+If the target output folder already exists, the script writes to a timestamped folder automatically.
+
+To overwrite the requested output folder explicitly:
+
+```powershell
+python cluster_images.py --input ./input --output ./output --overwrite
 ```
 
 Force CPU:
@@ -301,9 +357,73 @@ Use a different CLIP model:
 python cluster_images.py --input ./input --output ./output --model ViT-L/14
 ```
 
+Use a named preset:
+
+```powershell
+python cluster_images.py --input ./input --output ./output --preset strict
+```
+
+Use a different prompt set for strict item signatures:
+
+```powershell
+python cluster_images.py --input ./input --output ./output --strict-same-corner-items --prompt-set office
+```
+
+Generate per-image item flags in the outputs:
+
+```powershell
+python cluster_images.py --input ./input --output ./output --flag-items
+```
+
+The default item-flag backend is the repo-style `YOLOv8n-seg + heuristic scene CLIP` pipeline:
+
+```powershell
+python cluster_images.py --input ./input --output ./output --flag-items --flag-detector yolo_scene_clip --yolo-model yolov8n-seg.pt
+```
+
+If you want the older adaptive hybrid fallback pipeline instead of the default stack:
+
+```powershell
+python cluster_images.py --input ./input --output ./output --flag-items --flag-detector hybrid --yolo-model yolov8x-seg.pt
+```
+
+If you want YOLO-only instead of the default stack:
+
+```powershell
+python cluster_images.py --input ./input --output ./output --flag-items --flag-detector yolo --yolo-model yolov8n-seg.pt
+```
+
+If you want the explicit `SAM + DeepLabV3 + YOLOv8 + CLIP` pipeline:
+
+```powershell
+python cluster_images.py --input ./input --output ./output --flag-items --flag-detector sam_deeplab_yolo_clip --yolo-model yolov8x-seg.pt --sam-model mobile_sam.pt --deeplab-model deeplabv3_resnet101
+```
+
+Use an object-focused prompt set for labels such as `sky`, `grass`, `window`, or `kitchen cabinets`:
+
+```powershell
+python cluster_images.py --input ./input --output ./output --flag-items --flag-prompt-set visible_items
+```
+
+Write flags and annotated images to the output folders:
+
+```powershell
+python cluster_images.py --input ./input --output ./output --flag-items
+```
+
+Export clean copies without labels even when flags are generated:
+
+```powershell
+python cluster_images.py --input ./input --output ./output --flag-items --no-annotate-flagged-images
+```
+
 ## Thresholds And What They Do
 
 ### HDBSCAN thresholds
+
+- `--preset`
+  Applies a named threshold and feature-weight profile before explicit CLI overrides.
+  Available presets are `balanced`, `strict`, `loose`, `real_estate`, `office`, and `generic_indoor`.
 
 - `--min-cluster-size`
   Smaller values allow tiny clusters. Larger values force more images to merge or become noise.
@@ -341,8 +461,64 @@ python cluster_images.py --input ./input --output ./output --model ViT-L/14
   Higher values make merge-back stricter.
   Lower values let semantically similar subclusters merge more easily.
 
+- `--merge-view-threshold`
+  Requires minimum viewpoint compatibility before merge-back is allowed.
+
+- `--view-linkage`
+  Chooses the broad viewpoint refinement mode: `complete`, `average`, or `graph`.
+
 - `--strict-same-corner-items`
   Turns on the stricter same-corner plus same-items refinement path.
+
+- `--prompt-set`
+  Selects the prompt set used for strict item-signature features.
+
+- `--flag-items`
+  Writes per-image labels into `image_flags.json`, `match_scores.json`, `clusters.json`, and `summary.html`.
+  The default backend is `yolo_scene_clip`, which runs `yolov8n-seg.pt` for object masks, then labels heuristic scene candidates with CLIP.
+
+- `--flag-detector`
+  Selects the item-flag backend. The default is `yolo_scene_clip`.
+
+- `--sam-model`
+  SAM weights used when `--flag-detector sam_deeplab_yolo_clip` is enabled. Default is `mobile_sam.pt`.
+
+- `--deeplab-model`
+  DeepLabV3 backbone used when `--flag-detector sam_deeplab_yolo_clip` is enabled. Default is `deeplabv3_resnet101`.
+
+- `--deeplab-min-area`
+  Minimum image-area ratio required before a DeepLabV3 label is kept when `--flag-detector sam_deeplab_yolo_clip` is enabled.
+
+- `--yolo-model`
+  YOLO weights used when `--flag-items` is enabled. Default is `yolov8n-seg.pt`.
+
+- `--yolo-confidence`
+  Minimum YOLO detection confidence used when `--flag-detector yolo` is enabled. The default is `0.12`.
+
+- `--yolo-iou`
+  YOLO NMS IoU threshold used when `--flag-detector yolo` is enabled.
+
+- `--yolo-imgsz`
+  YOLO inference size used for each full-image or tiled pass. The default is `1536`.
+
+- `--yolo-max-det`
+  Maximum number of detections YOLO keeps per full-image or tiled pass. The default is `100`.
+
+- `--yolo-retina-masks`
+  Requests full-resolution segmentation masks from YOLO when supported. This is enabled by default.
+
+- `--flag-prompt-set`
+  Selects the prompt set used only for item flags. Default is `visible_items`, which is more object-focused than the room-level `real_estate` prompt set.
+
+- `--flag-top-k`
+  Maximum number of labels kept per image when `--flag-items` is enabled. The default is `6`.
+
+- `--flag-min-score`
+  Minimum prompt score required before a label is surfaced when `--flag-items` is enabled.
+
+- `--annotate-flagged-images`
+  Draws outline-style regions and labels onto the copied images inside the cluster and noise folders.
+  This is enabled by default when `--flag-items` is used. Pass `--no-annotate-flagged-images` to disable it.
 
 - `--item-similarity-threshold`
   Higher values require stronger room/item similarity.
@@ -353,24 +529,53 @@ python cluster_images.py --input ./input --output ./output --model ViT-L/14
 - `--semantic-similarity-floor`
   Prevents semantically different scenes from merging even if viewpoint looks similar.
 
+- `--strict-linkage`
+  Chooses the strict refinement mode: `complete`, `average`, or `graph`.
+
+- `--orb-weight`
+  Controls how strongly ORB matching contributes to viewpoint similarity.
+
+- `--structure-weight`
+  Controls the additional structural similarity contribution.
+
+- `--local-descriptor-mode`
+  Enables the learned local descriptor branch. Current option: `clip_tiles`.
+
+- `--local-descriptor-weight`
+  Controls how strongly the learned local descriptor contributes to viewpoint similarity.
+
+### Output controls
+
+- `--overwrite`
+  Replace the requested output folder if it already exists.
+
+- `--skip-contact-sheets`
+  Skip contact sheet generation for clusters and noise.
+
+- `--skip-html-summary`
+  Skip generating `summary.html`.
+
+- `--validate-setup`
+  Print dependency and prompt-set validation details, then exit.
+
 ## Useful Commands
 
 Balanced default:
 
 ```powershell
-python cluster_images.py --input ./input --output ./output
+python cluster_images.py --input ./input --output ./output --preset balanced
 ```
 
 Stricter same-corner clustering:
 
 ```powershell
-python cluster_images.py --input ./input --output ./output --semantic-weight 0.30 --layout-weight 0.40 --edge-weight 0.25 --color-weight 0.05 --view-similarity-threshold 0.38
+python cluster_images.py --input ./input --output ./output --preset strict
 ```
 
 Looser merging:
 
 ```powershell
-python cluster_images.py --input ./input --output ./output --cluster-epsilon 0.08 --semantic-merge-threshold 0.93
+python cluster_images.py --input ./input --output ./output --preset loose
 ```
 
 Force fewer noise points:
@@ -384,6 +589,42 @@ Strict same-corner plus same-items:
 ```powershell
 python cluster_images.py --input ./input --output ./output_strict_items --device cpu --strict-same-corner-items
 ```
+
+Balanced clustering plus visible-item flags:
+
+```powershell
+python cluster_images.py --input ./input --output ./output_flagged --flag-items
+```
+
+Strict mode with an alternate prompt set and average-link refinement:
+
+```powershell
+python cluster_images.py --input ./input --output ./output_strict_items --strict-same-corner-items --prompt-set generic_indoor --strict-linkage average --structure-weight 0.03
+```
+
+Strict mode with graph refinement and learned local descriptors:
+
+```powershell
+python cluster_images.py --input ./input --output ./output_graph_local --preset strict --strict-same-corner-items --prompt-set generic_indoor --view-linkage graph --strict-linkage graph --local-descriptor-mode clip_tiles --local-descriptor-weight 0.12
+```
+
+## Evaluation Harness
+
+Define expected labels in `benchmark/labels_template.json`, or use the real benchmark file `benchmark/real_estate_ground_truth.json`, then compare one or more runs:
+
+```powershell
+python evaluate_clusters.py --labels .\benchmark\labels_template.json --clusters .\output\clusters.json .\output_strict\clusters.json --output .\benchmark\comparison_report.json
+```
+
+The evaluation report includes:
+
+- pairwise precision
+- pairwise recall
+- pairwise F1
+- cluster purity
+- noise rate
+- predicted cluster count
+- average cluster size
 
 ## Current Behavior On Real-Estate Images
 
@@ -413,6 +654,21 @@ not as:
 ## Files
 
 - [cluster_images.py](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/cluster_images.py>): main clustering script
+- [evaluate_clusters.py](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/evaluate_clusters.py>): benchmark comparison script
+- [configs/presets.json](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/configs/presets.json>): preset threshold profiles
+- [configs/prompt_sets.json](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/configs/prompt_sets.json>): named strict-mode prompt sets
+- [benchmark/README.md](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/benchmark/README.md>): benchmark usage notes
+- [benchmark/real_estate_ground_truth.json](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/benchmark/real_estate_ground_truth.json>): real labeled benchmark for the current input set
 - [requirements.txt](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/requirements.txt>): Python dependencies
 - [input](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/input>): input images
 - [output](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/output>): clustered image output
+
+## Team Contributions
+
+Use the member names in place of `Member 1` to `Member 5`.
+
+- `Member 1`: Project integration and runtime pipeline. Covered CLI design, input discovery, image loading, device/runtime setup, preset application, and run/output management in [cluster_images.py](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/cluster_images.py>).
+- `Member 2`: Semantic intelligence layer. Covered CLIP loading, semantic embedding extraction, prompt-driven item features, and prompt-set design using [cluster_images.py](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/cluster_images.py>) and [configs/prompt_sets.json](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/configs/prompt_sets.json>).
+- `Member 3`: Visual feature engineering and viewpoint analysis. Covered layout, edge, color, opening-profile, ORB, and local-descriptor based similarity logic in [cluster_images.py](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/cluster_images.py>).
+- `Member 4`: Clustering and refinement engine. Covered semantic clustering, same-corner refinement, strict same-items grouping, quad split logic, broad-view refinement, and merge-back strategy in [cluster_images.py](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/cluster_images.py>) with threshold presets in [configs/presets.json](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/configs/presets.json>).
+- `Member 5`: Evaluation, benchmarking, and documentation. Covered benchmarking workflow, labeled ground-truth comparison, result interpretation, architecture notes, and project documentation through [evaluate_clusters.py](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/evaluate_clusters.py>), [benchmark/README.md](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/benchmark/README.md>), [ARCHITECTURE.md](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/ARCHITECTURE.md>), [FLOW_CHART.md](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/FLOW_CHART.md>), and [IMPLEMENTATION_PLAN.md](</c:/Users/Mohammed kaif M/OneDrive/Desktop/clustering images/IMPLEMENTATION_PLAN.md>).

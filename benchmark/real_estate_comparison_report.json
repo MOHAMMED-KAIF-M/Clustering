@@ -1,0 +1,56 @@
+{
+  "labels_file": "C:\\Users\\Mohammed kaif M\\OneDrive\\Desktop\\clustering images\\benchmark\\real_estate_ground_truth.json",
+  "runs": [
+    {
+      "pairwise_precision": 1.0,
+      "pairwise_recall": 1.0,
+      "pairwise_f1": 1.0,
+      "true_positive_pairs": 7,
+      "false_positive_pairs": 0,
+      "false_negative_pairs": 0,
+      "true_negative_pairs": 59,
+      "cluster_purity": 1.0,
+      "evaluated_images": 12,
+      "noise_rate": 0.0833,
+      "cluster_file": "C:\\Users\\Mohammed kaif M\\OneDrive\\Desktop\\clustering images\\output\\clusters.json",
+      "predicted_cluster_count": 5,
+      "average_cluster_size": 2.2,
+      "predicted_noise_count": 1,
+      "expected_noise_count": 1
+    },
+    {
+      "pairwise_precision": 1.0,
+      "pairwise_recall": 1.0,
+      "pairwise_f1": 1.0,
+      "true_positive_pairs": 7,
+      "false_positive_pairs": 0,
+      "false_negative_pairs": 0,
+      "true_negative_pairs": 59,
+      "cluster_purity": 1.0,
+      "evaluated_images": 12,
+      "noise_rate": 0.0833,
+      "cluster_file": "C:\\Users\\Mohammed kaif M\\OneDrive\\Desktop\\clustering images\\.tmp\\full_impl_check\\clusters.json",
+      "predicted_cluster_count": 5,
+      "average_cluster_size": 2.2,
+      "predicted_noise_count": 1,
+      "expected_noise_count": 1
+    },
+    {
+      "pairwise_precision": 0.3889,
+      "pairwise_recall": 1.0,
+      "pairwise_f1": 0.56,
+      "true_positive_pairs": 7,
+      "false_positive_pairs": 11,
+      "false_negative_pairs": 0,
+      "true_negative_pairs": 48,
+      "cluster_purity": 0.75,
+      "evaluated_images": 12,
+      "noise_rate": 0.0,
+      "cluster_file": "C:\\Users\\Mohammed kaif M\\OneDrive\\Desktop\\clustering images\\.tmp\\graph_local_check\\clusters.json",
+      "predicted_cluster_count": 4,
+      "average_cluster_size": 3.0,
+      "predicted_noise_count": 0,
+      "expected_noise_count": 1
+    }
+  ]
+}

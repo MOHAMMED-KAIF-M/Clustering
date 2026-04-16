@@ -1,0 +1,37 @@
+{
+  "labels_file": "C:\\Users\\Mohammed kaif M\\OneDrive\\Desktop\\clustering images\\benchmark\\labels_template.json",
+  "runs": [
+    {
+      "pairwise_precision": 0.0,
+      "pairwise_recall": 0.0,
+      "pairwise_f1": 0.0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "false_negative_pairs": 0,
+      "true_negative_pairs": 0,
+      "cluster_purity": 0.0,
+      "evaluated_images": 0,
+      "noise_rate": 0.0,
+      "cluster_file": "C:\\Users\\Mohammed kaif M\\OneDrive\\Desktop\\clustering images\\.tmp\\full_impl_check\\clusters.json",
+      "predicted_cluster_count": 5,
+      "average_cluster_size": 2.2,
+      "predicted_noise_count": 1
+    },
+    {
+      "pairwise_precision": 0.0,
+      "pairwise_recall": 0.0,
+      "pairwise_f1": 0.0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "false_negative_pairs": 0,
+      "true_negative_pairs": 0,
+      "cluster_purity": 0.0,
+      "evaluated_images": 0,
+      "noise_rate": 0.0,
+      "cluster_file": "C:\\Users\\Mohammed kaif M\\OneDrive\\Desktop\\clustering images\\.tmp\\full_impl_strict_check\\clusters.json",
+      "predicted_cluster_count": 4,
+      "average_cluster_size": 2.5,
+      "predicted_noise_count": 2
+    }
+  ]
+}
